@@ -37,16 +37,14 @@ where $k$ is the number of divisions and $N_0$ is the starting population.
 
 Assuming that a colony of 6E8 cells on a petri dish is what is required to be visible to the human eye, how quickly would a bacterium doubling every 20 minutes become visible? What about a bacterium that divides once per month?
 
-NOTE: "Generation time" is the time required for one cell doubling.
-
 ```{r}
 colonies <- tibble(
-  gen_time_hr = seq(0.3, 730, by = 0.5), # a set of generation times in divisions per hour
+  gen_time_hr = seq(0.3, 730, by = 0.5), # a sequence of generation times in divisions per hour
   gen_time_day = gen_time_hr / 24, # convert to days
   cells_required = 6E8, # a constant telling us the threshold at which a colony becomes visible 
-  divisions_required = "YOUR ANSWER HERE", # calculate how many binary cell divisions are required to reach the visible threshold
-  time_required_hr = "YOUR ANSWER HERE", # determine time required in hours
-  time_required_day = "YOUR ANSWER HERE" # determine time required in days
+  divisions_required = log2(cells_required), # calculate how many binary cell divisions are required to reach the visible threshold
+  time_required_hr = divisions_required * gen_time_hr, # determine time required
+  time_required_day = time_required_hr / 24
 )
 
 times <- c(24, 72, 730) # one day, three days, one month
@@ -114,12 +112,12 @@ Using the above equation, plot isotopic enrichment of biomass as a function of t
 biomass_estimate <- tibble(
   t = seq(0, 2, by = 0.01),
   f_wspiked = 1, # consider tracer to be pure
-  u = 1, # constant growth rate
-  f_Boriginal = 0, # assume zero incorporation at start
-  f_B = "YOUR ANSWER HERE"
+  u = 1,
+  f_Boriginal = 0,
+  f_B = (f_wspiked * (1 - exp(-u*t)) + (f_Boriginal * exp(-u*t)))
 )
 
-ggplot(data = biomass_estimate, aes(x = t, y = f_B * 100)) + # changed f_B to percentage
+ggplot(data = biomass_estimate, aes(x = t, y = f_B * 100)) +
   geom_line() +
   ylab("Isotopic Enrichment (%)") +
   xlab("Time") +
@@ -144,7 +142,7 @@ Substituting the growth rate for the expected generation time ($µ=\ln(2)/T$), o
 $$
 t = \frac{T}{\ln(2)} \cdot \ln \left(\frac{a\cdot F_L - F_0}{a\cdot F_L - F_t}\right)
 $$
-For an interactive demonstration of using this labeling calculator, I suggest https://kopflab.shinyapps.io/isolabel/.
+For an interactive demonstration of using this labeling calculator, I suggest https://kopflab.shinyapps.io/isolabel/. 
 
 ### Task 1C: Derive the Conversion of Growth Rate into Generation Time (Doubling Time)
 
@@ -158,12 +156,13 @@ Using this, solve for the *doubling time* $t$, the amount of time required for a
 
 $$
 N_t = N_0 \cdot e^{µt} \\
- ...\\
- your \space answer\\
- ...
+2N_0 = N_0e^{µt} \\
+2 = e^{µt} \\
+ln(2) = µt \\
+\frac{ln(2)}{µ} = t
 $$
 
-This equation will come in handy later!
+This is a tool that will help us later!
 
 ## Calculate Generation Times from Isotopic Enrichment Data
 
@@ -183,13 +182,16 @@ F_T = a \cdot F_L \left(1-e^{-\mu\cdot t}\right) + F_{0} \cdot e^{-\mu \cdot t} 
 \downarrow \\
 solve \space for \space \mu \\
 \downarrow \\
- your \space answer\\
+\mu = \frac{1}{t} \cdot \ln\frac{(F_T - a*F_L)}{(F_0 - a*F_L)}
 $$
 
 
 ```{r}
 gencalc <- function(a, FT, F0, FL, t) {
-  ### Your answer
+  case_when(
+    t == 0 ~ NA_real_,
+    TRUE ~ - (1/t)*(log((FT - a*FL)/(F0 - a*FL)))
+  )
 }
 ```
 
@@ -205,7 +207,7 @@ iso_data <- tibble(
   compound = "iso 15:0",
   t = c(50, 50, 50), # labeling time in hours
   d2H = c(40.193510, 133.178118, 612.08982), # delta 2H values in permil measured after labeling time
-  R = "YOUR ANSWER", # convert delta to isotope ratio
+  R = (d2H/1000 + 1) * ref_ratio, # convert delta to isotope ratio
   FT = (R / (1+R)), # convert isotope ratio to fractional abundance
   FL = 0.005, # tracer strength of 0.005 (0.5at%)
   t0 = 0, # time zero = 0
@@ -213,9 +215,9 @@ iso_data <- tibble(
   F0 = 0.0001505666, # baseline 2H abundance before labeling experiment
   d_FT = FT - F0, # change in isotopic composition
   d_t = t - t0, # change in time
-  u_hr = "YOUR ANSWER", # growth rate in hours
-  u_d = "YOUR ANSWER", # growth rate in days
-  gen_d = "YOUR ANSWER" # generation time in days
+  u_hr = gencalc(a = a, FT = d_FT, F0 = 0, FL = FL, t = t), # growth rate in hours
+  u_d = u_hr * 24, # growth rate in days
+  gen_d = log(2) / u_d # generation time in days
 )
 ```
 
